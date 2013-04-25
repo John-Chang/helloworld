@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configtree>
+	<configtype type="user">
+		<config file_path="">
+			user demo
+		</config>
+	</configtype>
+	<configtype type="builtin">
+		<config file_path="">
+			builtin demo
+		</config>
+	</configtype>
+	<configtype type="team">
+		<config file_path="">
+			team demo
+		</config>
+	</configtype>
+</configtree>

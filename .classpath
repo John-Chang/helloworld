@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<classpath>
+	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
+	<classpathentry kind="con" path="org.eclipse.pde.core.requiredPlugins"/>
+	<classpathentry kind="lib" path="D:/eclipse/junoee/plugins/org.eclipse.swt.win32.win32.x86_3.100.1.v4234e.jar"/>
+	<classpathentry kind="lib" path="D:/eclipse/junoee/plugins/org.eclipse.text_3.5.200.v20120523-1310.jar"/>
+	<classpathentry kind="lib" path="C:/Users/zzj/Desktop/Choco/choco-2.1.5/choco-solver-2.1.5-with-sources.jar"/>
+	<classpathentry kind="lib" path="C:/Users/zzj/Desktop/Choco/choco-2.1.5/samples-2.1.5.jar"/>
+	<classpathentry kind="lib" path="D:/eclipse/junoee/plugins/org.eclipse.equinox.common_3.6.100.v20120522-1841.jar"/>
+	<classpathentry kind="lib" path="D:/eclipse/junoee/plugins/org.eclipse.core.resources_3.8.1.v20120802-154922.jar"/>
+	<classpathentry kind="lib" path="D:/eclipse/junoee/plugins/org.eclipse.core.runtime_3.8.0.v20120521-2346.jar"/>
+	<classpathentry kind="lib" path="D:/eclipse/junoee/plugins/org.eclipse.jface_3.8.101.v20120817-083647.jar"/>
+	<classpathentry kind="lib" path="D:/eclipse/junoee/plugins/org.eclipse.jdt.core_3.8.3.v20130121-145325.jar"/>
+	<classpathentry kind="lib" path="D:/eclipse/junoee/plugins/org.eclipse.jdt.core.source_3.7.1.v_B76_R37x.jar"/>
+	<classpathentry kind="output" path="bin"/>
+</classpath>

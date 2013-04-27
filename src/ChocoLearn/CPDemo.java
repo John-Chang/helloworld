@@ -1,20 +1,32 @@
 package ChocoLearn;
 
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Set;
+
+import org.eclipse.jdt.core.dom.Expression;
+import org.eclipse.jdt.core.dom.InfixExpression;
+import org.eclipse.jdt.core.dom.NumberLiteral;
+import org.eclipse.jdt.core.dom.SimpleName;
+
+//import static choco.Choco;
 import choco.Choco;
 import choco.cp.model.CPModel;
-import choco.kernel.model.variables.integer.IntegerVariable;
-import choco.kernel.model.variables.real.RealExpressionVariable;
-import choco.kernel.model.variables.real.RealVariable;
-import choco.kernel.model.variables.set.SetVariable;
-import choco.kernel.model.constraints.Constraint;
-import choco.kernel.solver.Configuration;
 import choco.cp.solver.CPSolver;
 import choco.cp.solver.search.real.CyclicRealVarSelector;
 import choco.cp.solver.search.real.RealIncreasingDomain;
 import choco.cp.solver.search.set.MinDomSet;
 import choco.cp.solver.search.set.MinEnv;
+import choco.kernel.model.constraints.Constraint;
+import choco.kernel.model.variables.integer.IntegerExpressionVariable;
+import choco.kernel.model.variables.integer.IntegerVariable;
+import choco.kernel.model.variables.real.RealExpressionVariable;
+import choco.kernel.model.variables.real.RealVariable;
+import choco.kernel.model.variables.set.SetVariable;
+import choco.kernel.solver.Configuration;
 
 public class CPDemo {
+	// int、float、double类型数据的值域
 	public static final int intupperlimit = Integer.MAX_VALUE;
 	public static final int intlowerlimit = Integer.MIN_VALUE;
 
@@ -23,29 +35,341 @@ public class CPDemo {
 
 	public static final double doubleupperlimit = Double.MAX_VALUE;
 	public static final double doublelowerlimit = Double.MIN_VALUE;
+	
+	public static HashMap envVariableValueHashMap=new HashMap<String, IntegerVariable>();
 
 	/**
 	 * @param args
 	 */
 	public static void main(String[] args) {
-		 simpleDemo();
-		problem1();
+		ExpressionNode root = null;
+		root = prepare();
+		// 先序遍历root为根的树，在遍历的同时建立envVariableValueHashMap环境
+		preVisitExpressionTree(root);
+		// 根据ExpressionNode为根的表达式树进行约束建模（Constraint Modeling）,并建立约束
+		println("");
+		println(expressionModeling(root));
+		Constraint constraint = Choco.lt(5, expressionModeling(root));
+		// 进行求解
+		CPModel model = new CPModel();
+		model.addConstraint(constraint);
+		CPSolver solver = new CPSolver();
+		solver.read(model);
+		boolean solverable = solver.solve();
+		println(solverable);
+//		simpleDemo();
+//		problem1();
+	}
+	
+	
+	/**
+	 * 遍历envVariableValueHashMap里的key
+	 */
+	private static void transEnv(){
+		Set variableSet=envVariableValueHashMap.keySet();
+		for (Iterator iterator = variableSet.iterator(); iterator.hasNext();) {
+			println(iterator.next());
+		}
+	}
+	
+	/**
+	 * 对一个Expression建立其表达式变量并返回
+	 * @param root
+	 * @return
+	 */
+	public static IntegerExpressionVariable expressionModeling(ExpressionNode root){
+		IntegerExpressionVariable result = null;
+		ExpressionType type=root.getType();
+		if (type==ExpressionType.expression) {
+			ExpressionOperator operator = root.getOperator();
+			ExpressionNode leftPart = root.getLeft();
+			ExpressionNode rightPart = root.getRight();
+			ExpressionType leftType = leftPart.getType();
+			ExpressionType rightType = rightPart.getType();
+			/*
+			 * 下述步骤是将表达式递归的构建成IntegerExpressionVariable，以提供给最后的Constraint、
+			 * 主要思路是针对左右两部分不同的类型进行表达式变量的构建，对int，variable和expression进行各种组合
+			 * 需要注意的是在组合中没有(int, int)，这是因为如果两个子节点都是int具体数值的话，那么这个表达式将是可以
+			 * 被计算出来的，其将会被计算结果代替。这一步的工作可能在符号执行过程中完成，也可能通过一个函数对表达式树进行
+			 * 后序遍历来完成
+			 */
+			switch (operator) {
+			case minus: {
+				// int and variable
+				if (leftType == ExpressionType.single_int && rightType == ExpressionType.single_variable) {
+					int leftValue = Integer.parseInt(leftPart.getValue());
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					print((IntegerVariable) envVariableValueHashMap.get(rightPart.getValue()));
+					result = Choco.minus(leftValue, rightValue);
+				}else if (rightType == ExpressionType.single_int && leftType == ExpressionType.single_variable) {
+					int rightValue = Integer.parseInt(rightPart.getValue());
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					print((IntegerVariable) envVariableValueHashMap.get(leftPart.getValue()));
+					result = Choco.minus(leftValue, rightValue);
+				}
+				// int and expression
+				else if (leftType == ExpressionType.single_int && rightType == ExpressionType.expression) {
+					int leftValue = Integer.parseInt(leftPart.getValue());
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.minus(leftValue, rightValue);
+				}else if (rightType == ExpressionType.single_int && leftType == ExpressionType.expression) {
+					int rightValue = Integer.parseInt(rightPart.getValue());
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					result = Choco.minus(leftValue, rightValue);
+				}
+				// expression and variable
+				else if (leftType == ExpressionType.expression && rightType == ExpressionType.single_variable) {
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					result = Choco.minus(leftValue, rightValue);
+				}else if (rightType == ExpressionType.expression && leftType == ExpressionType.single_variable) {
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.minus(leftValue, rightValue);
+				}
+				// both are expression
+				else if (leftType == ExpressionType.expression && rightType == ExpressionType.expression) {
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.minus(leftValue, rightValue);
+				}
+				// both are variable
+				else if (leftType == ExpressionType.single_variable && rightType == ExpressionType.single_variable) {
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					result = Choco.minus(leftValue, rightValue);
+				}
+				break;
+			}
+			case plus: {
+				// int and variable
+				if (leftType == ExpressionType.single_int && rightType == ExpressionType.single_variable) {
+					int leftValue = Integer.parseInt(leftPart.getValue());
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					result = Choco.plus(leftValue, rightValue);
+				}else if (rightType == ExpressionType.single_int && leftType == ExpressionType.single_variable) {
+					int rightValue = Integer.parseInt(rightPart.getValue());
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					result = Choco.plus(leftValue, rightValue);
+				}
+				// int and expression
+				else if (leftType == ExpressionType.single_int && rightType == ExpressionType.expression) {
+					int leftValue = Integer.parseInt(leftPart.getValue());
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.plus(leftValue, rightValue);
+				}else if (rightType == ExpressionType.single_int && leftType == ExpressionType.expression) {
+					int rightValue = Integer.parseInt(rightPart.getValue());
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					result = Choco.plus(leftValue, rightValue);
+				}
+				// expression and variable
+				else if (leftType == ExpressionType.expression && rightType == ExpressionType.single_variable) {
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					result = Choco.plus(leftValue, rightValue);
+				}else if (rightType == ExpressionType.expression && leftType == ExpressionType.single_variable) {
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.plus(leftValue, rightValue);
+				}
+				// both are expression
+				else if (leftType == ExpressionType.expression && rightType == ExpressionType.expression) {
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.plus(leftValue, rightValue);
+				}
+				// both are variable
+				else if (leftType == ExpressionType.single_variable && rightType == ExpressionType.single_variable) {
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					result = Choco.plus(leftValue, rightValue);
+				}
+				break;
+			}
+			case multi: {
+				// int and variable
+				if (leftType == ExpressionType.single_int && rightType == ExpressionType.single_variable) {
+					int leftValue = Integer.parseInt(leftPart.getValue());
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					result = Choco.mult(leftValue, rightValue);
+				}else if (rightType == ExpressionType.single_int && leftType == ExpressionType.single_variable) {
+					int rightValue = Integer.parseInt(rightPart.getValue());
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					result = Choco.mult(leftValue, rightValue);
+				}
+				// int and expression
+				else if (leftType == ExpressionType.single_int && rightType == ExpressionType.expression) {
+					int leftValue = Integer.parseInt(leftPart.getValue());
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.mult(leftValue, rightValue);
+				}else if (rightType == ExpressionType.single_int && leftType == ExpressionType.expression) {
+					int rightValue = Integer.parseInt(rightPart.getValue());
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					result = Choco.mult(leftValue, rightValue);
+				}
+				// expression and variable
+				else if (leftType == ExpressionType.expression && rightType == ExpressionType.single_variable) {
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					result = Choco.mult(leftValue, rightValue);
+				}else if (rightType == ExpressionType.expression && leftType == ExpressionType.single_variable) {
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.mult(leftValue, rightValue);
+				}
+				// both are expression
+				else if (leftType == ExpressionType.expression && rightType == ExpressionType.expression) {
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.mult(leftValue, rightValue);
+				}
+				// both are variable
+				else if (leftType == ExpressionType.single_variable && rightType == ExpressionType.single_variable) {
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					result = Choco.mult(leftValue, rightValue);
+				}
+				break;
+			}
+			case div: {
+				// int and variable
+				if (leftType == ExpressionType.single_int && rightType == ExpressionType.single_variable) {
+					int leftValue = Integer.parseInt(leftPart.getValue());
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					result = Choco.div(leftValue, rightValue);
+				}else if (rightType == ExpressionType.single_int && leftType == ExpressionType.single_variable) {
+					int rightValue = Integer.parseInt(rightPart.getValue());
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					result = Choco.div(leftValue, rightValue);
+				}
+				// int and expression
+				else if (leftType == ExpressionType.single_int && rightType == ExpressionType.expression) {
+					int leftValue = Integer.parseInt(leftPart.getValue());
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.div(leftValue, rightValue);
+				}else if (rightType == ExpressionType.single_int && leftType == ExpressionType.expression) {
+					int rightValue = Integer.parseInt(rightPart.getValue());
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					result = Choco.div(leftValue, rightValue);
+				}
+				// expression and variable
+				else if (leftType == ExpressionType.expression && rightType == ExpressionType.single_variable) {
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					result = Choco.div(leftValue, rightValue);
+				}else if (rightType == ExpressionType.expression && leftType == ExpressionType.single_variable) {
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.div(leftValue, rightValue);
+				}
+				// both are expression
+				else if (leftType == ExpressionType.expression && rightType == ExpressionType.expression) {
+					IntegerExpressionVariable leftValue = expressionModeling(leftPart);
+					IntegerExpressionVariable rightValue = expressionModeling(rightPart);
+					result = Choco.div(leftValue, rightValue);
+				}
+				// both are variable
+				else if (leftType == ExpressionType.single_variable && rightType == ExpressionType.single_variable) {
+					IntegerVariable leftValue = (IntegerVariable) envVariableValueHashMap.get(leftPart.getValue());
+					IntegerVariable rightValue = (IntegerVariable) envVariableValueHashMap.get(rightPart.getValue());
+					result = Choco.div(leftValue, rightValue);
+				}
+				break;
+			}
+			}
+
+		}
+		/*
+		 * 被注释掉的这段应该是用不着的
+		 */
+//		else if (type==ExpressionType.single_int) {
+//			
+//		}else if (type==ExpressionType.single_variable) {
+//			
+//		}
+		return result;
+	}
+	
+	/**
+	 * 为约束表达式建立约束
+	 * @param exp
+	 * @return
+	 */
+	public static Constraint constraintModelingaf(InfixExpression exp){
+		Constraint constraint = null;
+		exp.getOperator();
+		exp.getLeftOperand();
+		exp.getRightOperand();
+		return constraint;
+	}
+	
+	public static ExpressionNode getExpressionNode(Expression exp){
+		ExpressionNode result = null;
+		ExpressionNode leftPart=null;
+		ExpressionNode rightPart=null;
+		ExpressionType type=null;
+		ExpressionOperator operator=null;
+//		InfixExpression.Operator operator;
+		
+		if (exp instanceof InfixExpression) {
+			((InfixExpression) exp).getOperator();
+		}else if (exp instanceof SimpleName) {
+			
+		}else if (exp instanceof NumberLiteral) {
+			
+		}
+		return result;
+	}
+	
+	// 准备测试数据Expression
+	public static ExpressionNode prepare(){
+		ExpressionNode leaf1= new ExpressionNode(ExpressionType.single_int, "58",ExpressionOperator.plus, null, null);
+		ExpressionNode leaf2= new ExpressionNode(ExpressionType.single_variable, "a",ExpressionOperator.minus,null, null);
+		ExpressionNode branch1= new ExpressionNode(ExpressionType.expression, null,ExpressionOperator.plus,leaf1, leaf2);
+		ExpressionNode leaf3= new ExpressionNode(ExpressionType.single_int, "29",ExpressionOperator.minus, null, null);
+		return new ExpressionNode(ExpressionType.expression, null,ExpressionOperator.minus,branch1, leaf3);
+	}
+	
+	
+	// 先序访问ExpressionNode代表的表达式树
+	public static void preVisitExpressionTree(ExpressionNode root){
+		if (root!=null) {
+			if(root.operator!=null){
+				print("(");
+				preVisitExpressionTree(root.getLeft());
+				print(root.getOperator());
+				preVisitExpressionTree(root.getRight());
+				print(")");
+			}else {
+				print(root.getValue());
+				if(root.getType()==ExpressionType.single_variable){
+					String variableName = root.getValue();
+					if (!envVariableValueHashMap.containsKey(variableName)) {
+						envVariableValueHashMap.put(variableName, new IntegerVariable(variableName, intlowerlimit, intupperlimit));
+					}
+				}
+			}
+		}
+	}
+
+	private static void println(Object o) {
+		System.out.println(o);
 	}
 
 	private static void print(Object o) {
-		System.out.println(o);
+		System.out.print(o);
 	}
 
 	// a simple demo of solve exhibition
 	private static void simpleDemo() {
-		IntegerVariable v = Choco.makeIntVar("v", 1, 10);
-		Constraint c = Choco.eq(v, 11);
+		IntegerVariable v = Choco.makeIntVar("v", new Integer(1), new Integer(10));
+		Constraint c = Choco.eq(v, new Integer(1));
 		CPModel model = new CPModel();
 		model.addConstraint(c);
 		CPSolver solver = new CPSolver();
 		solver.read(model);
 		boolean solverable = solver.solve();
-		print(solverable);
+		println(solverable);
 	}
 
 	// a demo to exhibit the process of Choco solving

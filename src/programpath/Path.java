@@ -1,0 +1,13 @@
+package programpath;
+
+public class Path {
+
+	/**
+	 * @param args
+	 */
+	public static void main(String[] args) {
+		// TODO Auto-generated method stub
+
+	}
+
+}
